@@ -9,7 +9,7 @@ import '../../data/app_state.dart';
 import '../home/home_screen.dart';
 import '../outfits/outfits_screen.dart';
 import '../profile/profile_screen.dart';
-import '../stylist/stylist_screen.dart';
+import '../stylist/stylist_desk_screen.dart';
 import '../wardrobe/wardrobe_screen.dart';
 
 /// The five destinations of the bottom navigation bar.
@@ -119,7 +119,7 @@ class _TabNavigator extends StatelessWidget {
   Widget _root() => switch (tab) {
     ShellTab.home => HomeScreen(onOpenTab: onOpenTab),
     ShellTab.wardrobe => const WardrobeScreen(),
-    ShellTab.stylist => const StylistScreen(),
+    ShellTab.stylist => const StylistDeskScreen(),
     ShellTab.outfits => const OutfitsScreen(),
     ShellTab.profile => const ProfileScreen(),
   };

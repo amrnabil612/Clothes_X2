@@ -44,6 +44,8 @@ class OutfitSuggestion {
     );
   }
 }
+String _lastAiMessage = '';
+
 
 // ==========================================
 // 2. THE SCREEN
@@ -69,7 +71,7 @@ class _StylistDeskScreenState extends State<StylistDeskScreen> {
 
   // 🔌 CONNECT YOUR NODE.JS BACKEND HERE
   // Replace with your actual IP or domain (e.g., http://10.0.2.2:3001 for Android Emulator)
-  static const String backendUrl = 'http://YOUR_IP_ADDRESS:3001/api/stylist/suggest';
+  static const String backendUrl = 'http://localhost:3001';
 
   @override
   void initState() {
@@ -83,45 +85,37 @@ class _StylistDeskScreenState extends State<StylistDeskScreen> {
     super.dispose();
   }
 
-  Future<void> _fetchOutfitFromAI() async {
+    Future<void> _fetchOutfitFromAI() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      // TODO: Uncomment and use this when your backend is running
-      /*
-      final response = await http.get(Uri.parse(backendUrl));
+      // 🔌 REAL API CALL (Uncommented)
+      // Use 10.0.2.2 for Android Emulator, or your PC's IP for physical device
+      final response = await http.post(
+        Uri.parse('$backendUrl/ai/generate-outfit'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'message': _lastAiMessage,
+        }),
+      );
       
       if (response.statusCode == 200) {
+        // This uses 'dart:convert' to parse the JSON
         final data = jsonDecode(response.body);
+        
+        final outfitData = data['outfits'][0];
+
         setState(() {
-          _currentOutfit = OutfitSuggestion.fromJson(data);
+          // This maps the JSON to your model
+          _currentOutfit = OutfitSuggestion.fromJson(outfitData);
           _isLoading = false;
         });
       } else {
         throw Exception('Failed to load outfit (Status: ${response.statusCode})');
       }
-      */
-
-      // MOCK DELAY FOR NOW (Remove this when uncommenting the real API call above)
-      await Future.delayed(const Duration(seconds: 2));
-      
-      setState(() {
-        _currentOutfit = OutfitSuggestion(
-          outfitId: "outfit_789",
-          matchScore: 94,
-          stylistNote: "Here is a smart-casual look for today's 24°C weather. The loafers elevate the jeans for your university presentation.",
-          items: [
-            ClothingItem(id: "1", name: "White Oxford", category: "Top", imageUrl: ""),
-            ClothingItem(id: "2", name: "Blue Jeans", category: "Bottom", imageUrl: ""),
-            ClothingItem(id: "3", name: "Brown Loafers", category: "Shoes", imageUrl: ""),
-          ],
-        );
-        _isLoading = false;
-      });
-
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -133,22 +127,26 @@ class _StylistDeskScreenState extends State<StylistDeskScreen> {
   // Helper to position items dynamically based on category
   Alignment _getAlignmentForCategory(String category) {
     switch (category.toLowerCase()) {
+      case 'tops':
       case 'top':
-        return const Alignment(-0.4, -0.5); 
+        return const Alignment(-0.6, -0.7); 
+      case 'bottoms':
       case 'bottom':
-        return const Alignment(0.4, 0.1);  
+        return const Alignment(0.6, 0.1);  
       case 'shoes':
-        return const Alignment(0.0, 0.7);  
+        return const Alignment(0.0, 0.8);  
       case 'dress':
         return const Alignment(0.0, 0.0);  
       case 'outerwear':
-        return const Alignment(-0.7, 0.1); 
+        return const Alignment(-0.8, 0.0); 
+      case 'accessories':
       case 'accessory':
-        return const Alignment(0.7, -0.6);
+        return const Alignment(0.8, -0.6);
       default:
         return const Alignment(0.0, 0.0);
     }
   }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -215,7 +213,7 @@ class _StylistDeskScreenState extends State<StylistDeskScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 15)],
               ),
               child: Stack(
                 children: [
@@ -241,7 +239,7 @@ class _StylistDeskScreenState extends State<StylistDeskScreen> {
                           onTap: () => _showSwapBottomSheet(item),
                         ),
                       );
-                    }).toList(),
+                    }),
                 ],
               ),
             ),
@@ -262,28 +260,60 @@ class _StylistDeskScreenState extends State<StylistDeskScreen> {
                 children: [
                   Row(
                     children: [
-                      CircleAvatar(backgroundColor: primaryPurple.withOpacity(0.1), child: Icon(Icons.auto_awesome, color: primaryPurple, size: 20)),
+                      CircleAvatar(backgroundColor: primaryPurple.withValues(alpha: 0.1), child: Icon(Icons.auto_awesome, color: primaryPurple, size: 20)),
                       const SizedBox(width: 12),
                       const Text("SmartWardrobe AI", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     ],
                   ),
                   const SizedBox(height: 12),
                   
-                  // AI Explanation (Scrollable to prevent overflow)
+                  // Replace the current AI Explanation Container with this:
+
                   Expanded(
                     flex: 2,
                     child: SingleChildScrollView(
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: bgColor,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          _currentOutfit?.stylistNote ?? "No explanation provided.", 
-                          style: TextStyle(color: textDark, height: 1.4, fontSize: 14)
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 1. The Chat Response (Conversational)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: bgColor,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              // Fallback to stylist note if chat message is empty
+                              _lastAiMessage.isNotEmpty ? _lastAiMessage : (_currentOutfit?.stylistNote ?? "No explanation provided."), 
+                              style: TextStyle(color: textDark, height: 1.4, fontSize: 14)
+                            ),
+                          ),
+                          
+                          // 2. The Stylist Note (The "Why this outfit" logic)
+                          if (_currentOutfit != null && _lastAiMessage.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.auto_awesome, size: 14, color: primaryPurple),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      _currentOutfit!.stylistNote,
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600, 
+                                        fontSize: 12, 
+                                        fontStyle: FontStyle.italic
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
@@ -342,20 +372,63 @@ class _StylistDeskScreenState extends State<StylistDeskScreen> {
     );
   }
 
-  void _sendMessage(String text) {
+  Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
+
     _chatController.clear();
     FocusScope.of(context).unfocus();
-    
-    // TODO: Send POST request to your backend here.
-    // await http.post(Uri.parse('.../api/stylist/chat'), body: jsonEncode({'message': text}));
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Sending to AI: "$text"'),
-        behavior: SnackBarBehavior.floating,
-      )
-    );
+
+    setState(() {
+      _isLoading = true; 
+    });
+
+    try {
+      final response = await http.post(
+        // The correct endpoint from your backend code
+        Uri.parse('$backendUrl/ai/chat'), 
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'message': text,
+          'history': [], // You can pass previous chat messages here later
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // Debug print so you can see exactly what the backend returned in your console
+        print("BACKEND RESPONSE: $data");
+
+        setState(() {
+          _lastAiMessage = data['reply'] ?? 'No response text provided.';
+          
+          if (data['outfit'] != null) {
+            _currentOutfit = OutfitSuggestion(
+              outfitId: data['outfit']['id'] ?? '',
+              matchScore: data['outfit']['match'] ?? 0, // Map 'match' to matchScore
+              stylistNote: data['outfit']['explanation'] ?? '', // Map 'explanation' to stylistNote
+              items: (data['outfit']['items'] as List?)?.map((i) => ClothingItem(
+                id: i['id'] ?? '',
+                name: i['name'] ?? 'Item',
+                category: i['category'] ?? 'Top',
+                imageUrl: i['image'] ?? '', // Map 'image' to imageUrl
+              )).toList() ?? [],
+            );
+          }
+          _isLoading = false; 
+        });
+      } else {
+        throw Exception('Failed to get reply (Status: ${response.statusCode})');
+      }
+    } catch (e) {
+      print("CHAT ERROR: $e"); // Log the error to see what went wrong
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not reach the stylist. Please try again.')),
+      );
+    }
   }
 
   void _showSwapBottomSheet(ClothingItem item) {
@@ -390,6 +463,9 @@ class _CanvasClothingItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Check if it's a network URL or a local asset
+    bool isNetwork = item.imageUrl.startsWith('http');
+
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -401,14 +477,22 @@ class _CanvasClothingItem extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.grey.shade200,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4))],
-              image: item.imageUrl.isNotEmpty 
-                  ? DecorationImage(image: NetworkImage(item.imageUrl), fit: BoxFit.cover) 
-                  : null,
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 4))],
             ),
-            child: item.imageUrl.isEmpty 
-                ? const Center(child: Icon(Icons.checkroom, size: 50, color: Colors.white54)) 
-                : null,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: item.imageUrl.isNotEmpty
+                  ? (isNetwork
+                      ? Image.network(item.imageUrl, fit: BoxFit.cover)
+                      : Image.asset(
+                          item.imageUrl, // Uses the local assets/images/ path
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(child: Icon(Icons.broken_image, color: Colors.red, size: 40));
+                          },
+                        ))
+                  : const Center(child: Icon(Icons.checkroom, size: 50, color: Colors.white54)),
+            ),
           ),
           const SizedBox(height: 8),
           Container(
@@ -416,7 +500,7 @@ class _CanvasClothingItem extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white, 
               borderRadius: BorderRadius.circular(10), 
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)]
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
             ),
             child: Text(item.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           ),
