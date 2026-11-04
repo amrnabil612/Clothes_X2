@@ -207,7 +207,7 @@ class _StylistDeskScreenState extends State<StylistDeskScreen> {
         children: [
           // CANVAS
           Expanded(
-            flex: 6,
+            flex: 5,
             child: Container(
               margin: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -247,7 +247,7 @@ class _StylistDeskScreenState extends State<StylistDeskScreen> {
 
           // CHAT & COMMANDS
           Expanded(
-            flex: 4,
+            flex: 5,
             child: Container(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               decoration: const BoxDecoration(
@@ -266,11 +266,8 @@ class _StylistDeskScreenState extends State<StylistDeskScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  
-                  // Replace the current AI Explanation Container with this:
 
                   Expanded(
-                    flex: 2,
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,8 +328,6 @@ class _StylistDeskScreenState extends State<StylistDeskScreen> {
                       ],
                     ),
                   ),
-                  
-                  const Spacer(),
                   
                   // Input Field
                   Padding(
