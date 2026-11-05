@@ -86,43 +86,54 @@ class _StylistDeskScreenState extends State<StylistDeskScreen> {
   }
 
     Future<void> _fetchOutfitFromAI() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // 🔌 REAL API CALL (Uncommented)
-      // Use 10.0.2.2 for Android Emulator, or your PC's IP for physical device
-      final response = await http.post(
-        Uri.parse('$backendUrl/ai/generate-outfit'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'message': _lastAiMessage,
-        }),
-      );
-      
-      if (response.statusCode == 200) {
-        // This uses 'dart:convert' to parse the JSON
-        final data = jsonDecode(response.body);
-        
-        final outfitData = data['outfits'][0];
-
-        setState(() {
-          // This maps the JSON to your model
-          _currentOutfit = OutfitSuggestion.fromJson(outfitData);
-          _isLoading = false;
-        });
-      } else {
-        throw Exception('Failed to load outfit (Status: ${response.statusCode})');
-      }
-    } catch (e) {
       setState(() {
-        _isLoading = false;
-        _errorMessage = "Could not connect to the Stylist. Please try again.";
+        _isLoading = true;
+        _errorMessage = null;
       });
+
+      try {
+        // Hit the generate-outfit endpoint for the initial load
+        final response = await http.post(
+          Uri.parse('$backendUrl/ai/generate-outfit'), 
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'occasion': 'casual'}), // Default occasion
+        );
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          
+          // Handle the response structure for generate-outfit
+          final outfitData = data['outfits'] != null && data['outfits'].isNotEmpty 
+              ? data['outfits'][0] 
+              : data['outfit'];
+
+          setState(() {
+            if (outfitData != null) {
+              _currentOutfit = OutfitSuggestion(
+                outfitId: outfitData['id'] ?? '',
+                matchScore: outfitData['match'] ?? outfitData['matchScore'] ?? 0,
+                stylistNote: outfitData['explanation'] ?? outfitData['stylistNote'] ?? '',
+                items: (outfitData['items'] as List?)?.map((i) => ClothingItem(
+                  id: i['id'] ?? '',
+                  name: i['name'] ?? 'Item',
+                  category: i['category'] ?? 'Top',
+                  imageUrl: i['image'] ?? i['imageUrl'] ?? '',
+                )).toList() ?? [],
+              );
+              _lastAiMessage = "Here is a fresh outfit based on your wardrobe and today's weather!";
+            }
+            _isLoading = false;
+          });
+        } else {
+          throw Exception('Failed to load initial outfit');
+        }
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = "Could not connect to the Stylist. Please try again.";
+        });
+      }
     }
-  }
 
   // Helper to position items dynamically based on category
   Alignment _getAlignmentForCategory(String category) {
@@ -458,8 +469,9 @@ class _CanvasClothingItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Check if it's a network URL or a local asset
-    bool isNetwork = item.imageUrl.startsWith('http');
+    // Determine if the image is a network URL or a local asset
+    final bool isNetwork = item.imageUrl.startsWith('http');
+    final bool hasImage = item.imageUrl.isNotEmpty;
 
     return GestureDetector(
       onTap: onTap,
@@ -470,34 +482,78 @@ class _CanvasClothingItem extends StatelessWidget {
             width: 110,
             height: 130,
             decoration: BoxDecoration(
-              color: Colors.grey.shade200,
+              color: Colors.grey.shade100, // Fallback background color
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 4))],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                )
+              ],
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: item.imageUrl.isNotEmpty
-                  ? (isNetwork
-                      ? Image.network(item.imageUrl, fit: BoxFit.cover)
+              child: !hasImage
+                  // 1. Fallback if the image URL is completely empty
+                  ? const Center(
+                      child: Icon(Icons.checkroom, size: 50, color: Colors.black26),
+                    )
+                  // 2. Network Image (e.g., http://...)
+                  : isNetwork
+                      ? Image.network(
+                          item.imageUrl,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF6C5CE7)),
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(
+                              child: Icon(Icons.broken_image, color: Colors.redAccent, size: 40),
+                            );
+                          },
+                        )
+                      // 3. Local Asset Image (e.g., assets/images/...)
                       : Image.asset(
-                          item.imageUrl, // Uses the local assets/images/ path
+                          item.imageUrl,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
-                            return const Center(child: Icon(Icons.broken_image, color: Colors.red, size: 40));
+                            // Fallback if the asset path is wrong or file is missing
+                            return const Center(
+                              child: Icon(Icons.broken_image, color: Colors.redAccent, size: 40),
+                            );
                           },
-                        ))
-                  : const Center(child: Icon(Icons.checkroom, size: 50, color: Colors.white54)),
+                        ),
             ),
           ),
           const SizedBox(height: 8),
+          
+          // The Label Container
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.white, 
-              borderRadius: BorderRadius.circular(10), 
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 4,
+                )
+              ],
             ),
-            child: Text(item.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            child: Text(
+              item.name,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis, // Prevents long names from breaking the UI
+            ),
           ),
         ],
       ),
